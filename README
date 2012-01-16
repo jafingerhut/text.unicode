@@ -1,0 +1,13 @@
+# com.fingerhutpress.text.unicode
+
+Some Clojure functions and macros for dealing with Unicode strings.
+
+## Usage
+
+See documentation for individual functions in the source code.
+
+## License
+
+Copyright (C) 2012 John Andrew Fingerhut (andy_fingerhut@alum.wustl.edu)
+
+Distributed under the Eclipse Public License, the same as Clojure.
