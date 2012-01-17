@@ -1,6 +1,7 @@
 (ns com.fingerhutpress.text.unicode.test
   (:use [com.fingerhutpress.text.unicode])
   (:use [clojure.test])
+  (:import (java.util.regex PatternSyntaxException))
   (:require [clojure.string :as str]))
 
 
@@ -470,12 +471,33 @@
     ;; test case D
     (if (or (> (:major jre-version) 1)
             (and (== (:major jre-version) 1) (> (:minor jre-version) 6)))
-      ;; 1.7 and later behavior I've seen
+
+      ;; 1.7 and later behavior I've seen.
+
+      ;; Note that support for \x{HHHHHH} syntax seems to have been
+      ;; added for regular expressions in Java 7, but to take
+      ;; advantage of it you must use re-pattern, and escape the
+      ;; backslash so that the backslash character gets passed through
+      ;; to the Java method for compiling regex patterns.
+
+      ;; I'm not aware of any plans to include this syntax in regular
+      ;; Java strings, or in the Clojure reader for strings and regex
+      ;; patterns, although it would be nice to have.  I think if it
+      ;; were added to the Clojure reader, using \x{HHHHHH} would be a
+      ;; little bit strange, in that if you were to use the code point
+      ;; for a special regex character like ( ) * + [ ], it would have
+      ;; its meaning as that special character, and not be escaped.
+      ;; That would best be mentioned in the documentation.
+
       (is (= "d834 dd1e" (f #"\ud834\udd1e")
-                         (f (re-pattern "\\ud834\\udd1e"))))
+                         (f (re-pattern "\\ud834\\udd1e"))
+                         (f (re-pattern "\\x{1D11E}"))))
+
       ;; 1.6 behavior I've seen, and perhaps earlier
-      (is (=  nil   (f #"\ud834\udd1e")
-                    (f (re-pattern "\\ud834\\udd1e")))))
+      (do
+        (is (=  nil   (f #"\ud834\udd1e")
+                      (f (re-pattern "\\ud834\\udd1e"))))
+        (is (thrown? PatternSyntaxException (f (re-pattern "\\x{1D11E}"))))))
     ;; test case E
     (is (= "d834 dd1e" (f (re-pattern "\ud834\udd1e"))))
 
