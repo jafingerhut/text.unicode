@@ -4,6 +4,14 @@
   (:require [clojure.string :as str]))
 
 
+(defn java-runtime-version []
+  (let [[major minor patch]
+        (map #(Long/parseLong %) (rest (re-find #"^(\d+)\.(\d+)\.(\d+)"
+                                                (get (System/getProperties)
+                                                     "java.runtime.version"))))]
+    {:major major, :minor minor, :patch patch}))
+
+
 ;; TBD: See if I can use com.fingerhutpress.clj-perls where chr and
 ;; ord are defined, instead of redefining it here.  DRY.
 
@@ -85,7 +93,7 @@
 ;; supplementary-codepoints
 ;; all-codepoints
 ;; all-codepoints-with-surrogates
-;; unicode-codepoint-to-utf16-codeunits
+;; cp-to-utf16
 ;; cp-strings-via-regex
 ;; cp-strings-via-codepoints
 ;; hex-codeunit-str
@@ -120,7 +128,7 @@
   (concat (bmp-codepoints) (supplementary-codepoints)))
 
 
-(defn unicode-codepoint-to-utf16-codeunits [codepoint]
+(defn cp-to-utf16 [codepoint]
   (if (bmp-codepoint? codepoint)
     [ codepoint ]
     (let [v (- codepoint Character/MIN_SUPPLEMENTARY_CODE_POINT)  ; 0x10000
@@ -264,6 +272,18 @@
            (apply str (map chr (reverse (codepoints s))))))))
 
 
+(defn contains-supp?-slower
+  [^CharSequence s]
+  (first (filter #(<= (int Character/MIN_SURROGATE)
+                      % (int Character/MAX_SURROGATE))
+                 (map int s))))
+
+
+(deftest test-contains-supp?
+  (doseq [s valid-utf16-strings]
+    (is (= (contains-supp? s) (contains-supp?-slower s)))))
+
+
 (deftest test-cp-count
   (doseq [s valid-utf16-strings]
     (is (= (cp-count s) (count (cp-strings-via-regex s))))))
@@ -385,6 +405,7 @@
 (deftest test-java-unicode-regex-matching-strangeness
   (let [s (str "a" COMBINING_GRAVE_ACCENT_STR "\u1234\u4567\u1b1b"
                MUSICAL_SYMBOL_G_CLEF_STR)
+        jre-version (java-runtime-version)
         f (fn [pat] (hex-codeunit-str (re-find pat s)))]
 
     ;; These test results all make sense to me.  It can find any
@@ -433,17 +454,28 @@
     ;; test case C
     (is (=  nil   (f (re-pattern "\udd1e"))))
 
-    ;; TBD: It cannot find the whole Unicode character by specifying
-    ;; its two surrogates exactly, using \uxxxx in the pattern.  This
-    ;; seems like a bug to me.  It can find the whole Unicode
-    ;; character by putting the actual Unicode character into the
-    ;; pattern itself, not the \uxxxx escape sequence.  This requires
-    ;; using re-pattern in Clojure.  This could be considered a
-    ;; workaround, I suppose.
+    ;; TBD: From testing on only a few JVMs, it appears that perhaps
+    ;; JDK 1.7 and later can find a whole Unicode character by
+    ;; specifying its two surrogates exactly, using \uxxxx in the
+    ;; pattern, but JDK 1.6 and earlier cannot.
+
+    ;; It seems likely this was considered a bug in JDK 1.6 that was
+    ;; fixed in 1.7.
+    
+    ;; Workaround: It can find the whole Unicode character by putting
+    ;; the actual Unicode character into the pattern itself, not the
+    ;; \uxxxx escape sequence.  This requires using re-pattern in
+    ;; Clojure.
 
     ;; test case D
-    (is (=  nil   (f #"\ud834\udd1e")
-                  (f (re-pattern "\\ud834\\udd1e"))))
+    (if (or (> (:major jre-version) 1)
+            (and (== (:major jre-version) 1) (> (:minor jre-version) 6)))
+      ;; 1.7 and later behavior I've seen
+      (is (= "d834 dd1e" (f #"\ud834\udd1e")
+                         (f (re-pattern "\\ud834\\udd1e"))))
+      ;; 1.6 behavior I've seen, and perhaps earlier
+      (is (=  nil   (f #"\ud834\udd1e")
+                    (f (re-pattern "\\ud834\\udd1e")))))
     ;; test case E
     (is (= "d834 dd1e" (f (re-pattern "\ud834\udd1e"))))
 

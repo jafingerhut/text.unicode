@@ -110,6 +110,29 @@
   (nil? (first-utf16-error s)))
 
 
+(defn contains-supp?
+  "Returns logical true (see below) if the string or CharSequence s
+   contains supplementary characters, outside the Basic Multilingual
+   Plane.  Returns nil if the string only contains characters in the
+   BMP.
+
+   For Java/Clojure strings, which are encoded in UTF-16, a string
+   contains supplementary characters only if the string contains at
+   least one surrogate code unit in the range U+D800 through U+DFFF.
+   If the string s contains such a UTF-16 surrogate code unit, the
+   UTF-16 integer code unit of the first one in the string is
+   returned."
+  [^CharSequence s]
+  (let [n (.length s)
+        min-surr (int Character/MIN_SURROGATE)
+        max-surr (int Character/MAX_SURROGATE)]
+    (loop [i 0]
+      (if (< i n)
+        (let [c (.charAt s i)]
+          (if (<= min-surr (int c) max-surr)
+            (int c)
+            (recur (inc i))))))))
+
 
 ;; TBD: Define for ^CharSequence?
 
