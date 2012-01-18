@@ -401,6 +401,28 @@
       (is (thrown? StringIndexOutOfBoundsException (cp-subs s 0 (inc n)))))))
 
 
+(defn cp-escape-slow [s cmap]
+  (let [strmap (reduce (fn [m [cp x]]
+                         (assoc m (chr cp) x))
+                       {} cmap)]
+    (apply str (map #(get strmap % %) (cp-strings-via-regex s)))))
+
+
+(deftest test-cp-escape
+  (let [f (fn [s cmap] (= (cp-escape s cmap) (cp-escape-slow s cmap)))]
+    (let [cmap {(ord MUSICAL_SYMBOL_G_CLEF_STR) "<MUSICAL SYMBOL G CLEF>",
+                (ord COMBINING_GRAVE_ACCENT_STR) "<COMBINING GRAVE ACCENT>"
+                (ord BABY_ANGEL_STR) "<BABY ANGEL>"}
+          s1 (str "a" COMBINING_GRAVE_ACCENT_STR "\u1234\u4567\u1b1b"
+                 MUSICAL_SYMBOL_G_CLEF_STR)]
+      (is (= (str "a" "<COMBINING GRAVE ACCENT>" "\u1234\u4567\u1b1b"
+                  "<MUSICAL SYMBOL G CLEF>")
+             (cp-escape s1 cmap)
+             (cp-escape-slow s1 cmap)))
+      (doseq [s valid-utf16-strings]
+        (is (= (cp-escape s cmap) (cp-escape-slow s cmap)))))))
+
+
 ;; The test below "passes" with this software:
 
 ;; Mac OS X 10.6.8

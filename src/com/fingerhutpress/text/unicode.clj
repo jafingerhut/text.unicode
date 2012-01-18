@@ -140,7 +140,8 @@
   "Returns the length of s in Unicode code points.  This can be
    smaller than (count s), if s contains UTF-16 surrogate pairs.
 
-   The behavior is undefined if the string is not valid UTF-16."
+   The behavior is undefined if the string is not valid UTF-16, as
+   determined by the function utf16?"
   [^String s]
   (.codePointCount s 0 (count s)))
 
@@ -172,7 +173,8 @@
    Under the assumption below, cp-subs takes time linear in the
    portion of the input string that it must scan to find the
    appropriate UTF-16 code unit index (or indices).  This is linear in
-   the value of end if end is specified, otherwise start.
+   the value of end if end is specified, otherwise it is linear in the
+   value of start.
 
    Assumption: Java's substring method in java.lang.String takes
    constant time, regardless of the length of the input string and the
@@ -191,3 +193,36 @@
        (cp-subs-helper s start end)
        (catch IndexOutOfBoundsException e
            (throw (StringIndexOutOfBoundsException.))))))
+
+
+(defn ^String cp-escape
+  "Return a new string, using cmap to escape each Unicode code point
+   ch from s as follows:
+   
+   If (cmap ch) is nil, append code point ch to the new string.
+   If (cmap ch) is non-nil, append (str (cmap ch)) instead.
+
+   The keys of cmap should be integer code points, not Java characters
+   or strings.
+
+   The behavior is undefined if s is not a valid UTF-16 string, as
+   determined by function utf16?"
+  {:added "1.2"}
+  [^CharSequence s cmap]
+  (let [len (.length s)
+        buffer (StringBuilder. len)]
+    (loop [i 0]
+      (if (< i len)
+        (let [c (.charAt s i)]
+          (if (Character/isHighSurrogate c)
+            (let [cp (.codePointAt s i)]
+              (if-let [replacement (cmap cp)]
+                (.append buffer replacement)
+                (.appendCodePoint buffer cp))
+              (recur (+ i 2)))
+            (let [cp (int c)]
+              (if-let [replacement (cmap cp)]
+                (.append buffer replacement)
+                (.appendCodePoint buffer cp))
+              (recur (inc i)))))
+        (.toString buffer)))))
