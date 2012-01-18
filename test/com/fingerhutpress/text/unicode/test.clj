@@ -214,6 +214,55 @@
   )
 
 
+(deftest test-escape-supp
+  (doseq [s valid-utf16-strings]
+    (if (contains-supp? s)
+      ;; Replace supplementary characters that might be there with
+      ;; their escapes using a different slower method.
+      (let [s2 (-> s
+                   (str/replace (re-pattern MUSICAL_SYMBOL_G_CLEF_STR)
+                                (format "<U+%06X>" (ord MUSICAL_SYMBOL_G_CLEF_STR)))
+                   (str/replace (re-pattern SMILING_FACE_WITH_OPEN_MOUTH_STR)
+                                (format "<U+%06X>" (ord SMILING_FACE_WITH_OPEN_MOUTH_STR)))
+                   (str/replace (re-pattern BABY_ANGEL_STR)
+                                (format "<U+%06X>" (ord BABY_ANGEL_STR)))
+                   (str/replace (re-pattern MIN_SUPPLEMENTARY_CODE_POINT_STR)
+                                (format "<U+%06X>" (ord MIN_SUPPLEMENTARY_CODE_POINT_STR)))
+                   (str/replace (re-pattern MAX_CODE_POINT_STR)
+                                (format "<U+%06X>" (ord MAX_CODE_POINT_STR)))
+                   )]
+        (is (= s2 (escape-supp s))))
+      ;; If there are no supplementary characters, escape-supp should
+      ;; return the original string.
+      (is (= s (escape-supp s)))))
+  
+  (is (= "\u0300 combining grave accent (not a surrogate)"
+         (escape-supp "\u0300 combining grave accent (not a surrogate)")))
+  (is (= "<U+D83D> only leading surrogate"
+         (escape-supp "\uD83D only leading surrogate")))
+  (is (= "<U+DE03> only trailing surrogate"
+         (escape-supp "\uDE03 only trailing surrogate")))
+  (is (= "only leading surrogate <U+D83D>"
+         (escape-supp "only leading surrogate \uD83D")))
+  (is (= (str "two consecutive "
+              (format "<U+%04X>" (int (.charAt MIN_LEADING_SURROGATE_STR 0)))
+              (format "<U+%04X>" (int (.charAt MAX_LEADING_SURROGATE_STR 0)))
+              " leading surrogates")
+         (escape-supp (str "two consecutive "
+                           MIN_LEADING_SURROGATE_STR
+                           MAX_LEADING_SURROGATE_STR
+                           " leading surrogates"))))
+  (is (= (str "two consecutive "
+              (format "<U+%04X>" (int (.charAt MIN_TRAILING_SURROGATE_STR 0)))
+              (format "<U+%04X>" (int (.charAt MAX_TRAILING_SURROGATE_STR 0)))
+              " trailing surrogates")
+           (escape-supp (str "two consecutive "
+                             MIN_TRAILING_SURROGATE_STR
+                             MAX_TRAILING_SURROGATE_STR
+                             " trailing surrogates"))))
+  )
+
+
 (deftest test-codepoints
   (is (= "61 300 1234 4567 1b1b 1d11e"
          (hex-codeunit-str

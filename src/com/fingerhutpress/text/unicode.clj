@@ -110,6 +110,40 @@
   (nil? (first-utf16-error s)))
 
 
+(defn ^String escape-supp
+  "Return a new string, replacing Unicode supplementary characters (or
+   code points), which require 2 Java chars to represent, with a
+   string of the form <U+XXXXXX>, where XXXXXX is the hexadecimal code
+   point value.  Do the same (except only use 4 hex digits) for
+   unpaired surrogate characters, which should never appear in valid
+   Unicode strings encoded as UTF-16."
+  [^CharSequence s]
+  (let [len (count s)
+        buffer (StringBuilder. len)]
+    (loop [i 0]
+      (if (< i len)
+        (let [c (.charAt s i)]
+          (cond (Character/isHighSurrogate c)
+                (let [i+1 (inc i)]
+                  (if (and (< i+1 len)
+                           (Character/isLowSurrogate (.charAt s i+1)))
+                    (do
+                      (.append buffer (format "<U+%06X>" (.codePointAt s i)))
+                      (recur (+ i 2)))
+                    (do
+                      (.append buffer (format "<U+%04X>" (int c)))
+                      (recur (inc i)))))
+                (Character/isLowSurrogate c)
+                (do
+                  (.append buffer (format "<U+%04X>" (int c)))
+                  (recur (inc i)))
+                :else
+                (do
+                  (.append buffer c)
+                  (recur (inc i)))))
+        (.toString buffer)))))
+
+
 (defn contains-supp?
   "Returns logical true (see below) if the string or CharSequence s
    contains supplementary characters, outside the Basic Multilingual
@@ -206,7 +240,14 @@
    or strings.
 
    The behavior is undefined if s is not a valid UTF-16 string, as
-   determined by function utf16?"
+   determined by function utf16?
+
+   Note that while clojure.string/escape is similar, it escapes UTF-16
+   code units, or Java chars.  If you wish to escape a Unicode
+   supplementary character, which requires 2 Java chars to represent,
+   clojure.string/escape can escape those two Java chars
+   independently, but not as a unit.  cp-escape can escape them as a
+   unit."
   [^CharSequence s cmap]
   (let [buffer (StringBuilder. (count s))]
     (docodepoints [c s]
