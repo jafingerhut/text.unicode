@@ -207,22 +207,10 @@
 
    The behavior is undefined if s is not a valid UTF-16 string, as
    determined by function utf16?"
-  {:added "1.2"}
   [^CharSequence s cmap]
-  (let [len (.length s)
-        buffer (StringBuilder. len)]
-    (loop [i 0]
-      (if (< i len)
-        (let [c (.charAt s i)]
-          (if (Character/isHighSurrogate c)
-            (let [cp (.codePointAt s i)]
-              (if-let [replacement (cmap cp)]
-                (.append buffer replacement)
-                (.appendCodePoint buffer cp))
-              (recur (+ i 2)))
-            (let [cp (int c)]
-              (if-let [replacement (cmap cp)]
-                (.append buffer replacement)
-                (.appendCodePoint buffer cp))
-              (recur (inc i)))))
-        (.toString buffer)))))
+  (let [buffer (StringBuilder. (count s))]
+    (docodepoints [c s]
+      (if-let [replacement (cmap c)]
+        (.append buffer replacement)
+        (.appendCodePoint buffer c)))
+    (.toString buffer)))
