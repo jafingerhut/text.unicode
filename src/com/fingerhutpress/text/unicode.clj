@@ -1,6 +1,8 @@
 (ns com.fingerhutpress.text.unicode
   (:require [clojure.string :as str]))
 
+(set! *warn-on-reflection* true)
+
 
 (defn bmp-codepoint? [c]
   (and (<= 0 c) (< c Character/MIN_SUPPLEMENTARY_CODE_POINT)))
@@ -18,7 +20,8 @@
 
 (defn codepoints
   "Returns a lazy sequence of integer Unicode code points in s.
-   Handles Unicode supplementary characters (above U+FFFF) correctly."
+   Handles Unicode supplementary characters (U+10000 and above)
+   correctly."
   [^String s]
   (let [len (.length s)
         f (fn thisfn [^String s i]
@@ -36,7 +39,7 @@
 
    Repeatedly executes body, with name bound to the integer code point
    of each Unicode character in the string.  Handles Unicode
-   supplementary characters (above U+FFFF) correctly."
+   supplementary characters (U+10000 and above) correctly."
   [bindings & body]
   (assert (vector bindings))
   (assert (= 2 (count bindings)))
@@ -56,6 +59,8 @@
                  (recur (inc i#))))))))))
 
 
+;; TBD: What about U+FFFE and U+FFFF characters?  Should strings
+;; containing them be considered invalid UTF-16?
 (defn first-utf16-error
   "Returns nil if s is a valid UTF-16 string, i.e. every leading (or
    high) surrogate, in the range U+D800 to U+DBFF inclusive, is
@@ -118,7 +123,8 @@
    unpaired surrogate characters, which should never appear in valid
    Unicode strings encoded as UTF-16."
   [^CharSequence s]
-  (let [len (count s)
+  (let [s (.toString s)
+        len (count s)
         buffer (StringBuilder. len)]
     (loop [i 0]
       (if (< i len)

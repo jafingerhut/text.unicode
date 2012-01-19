@@ -1,10 +1,13 @@
 (ns com.fingerhutpress.text.unicode.test
   (:use [com.fingerhutpress.text.unicode])
   (:use [clojure.test])
-  (:import (java.util.regex PatternSyntaxException))
+  (:import (java.util.regex PatternSyntaxException)
+           (java.text Normalizer))
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
             [clojure.pprint :as p]))
+
+(set! *warn-on-reflection* true)
 
 
 (defn java-runtime-version []
@@ -20,7 +23,11 @@
 
 (defn ^String chr
   "Return a string containing only the one specified Unicode code point,
-   although it may contain 1 or 2 UTF-16 code units."
+   although it may contain 1 or 2 UTF-16 code units.
+
+   Warning: Will return an invalid UTF-16 string containing only a
+   leading or trailing surrogate if you give it a codepoint in the
+   surrogate range, 0xD800 through 0xDFFF."
   [codepoint]
   (String. (Character/toChars codepoint)))
 
@@ -32,10 +39,11 @@
    0 if the string is empty.
 
    The behavior is undefined if the string is not valid UTF-16."
-  [s]
-  (if (= s "")   ; special case for Perl compatability
-    0
-    (.codePointAt s 0)))
+  [^CharSequence s]
+  (let [s (.toString s)]
+    (if (= s "")   ; special case for Perl compatability
+      0
+      (.codePointAt s 0))))
 
 
 ;; Some interesting boundary values, as strings.
@@ -144,13 +152,23 @@
 
 (defn hex-codeunit-str
   "Take string s and return a string consisting of s's 16-bit UTF-16
-   code units, in shown as hexadecimal numbers, separated by spaces.
+   code units, shown as hexadecimal numbers, separated by spaces.
    Useful for showing the precise contents of strings containing
    Unicode characters that do not show up in your system's default
    font."
   [s]
   (if s
-    (str/join " " (map #(format "%x" (int %)) s))))
+    (str/join " " (map #(format "%X" (int %)) s))))
+
+
+(defn hex-codepoint-str
+  "Take string s and return a string consisting of s's Unicode code points,
+   shown as hexadecimal numbers, separated by spaces.  Useful for
+   showing the precise contents of strings containing Unicode
+   characters that do not show up in your system's default font."
+  [s]
+  (if s
+    (str/join " " (map #(format "%X" %) (codepoints s)))))
 
 
 (deftest ^:slow test-ord-slow
@@ -245,16 +263,16 @@
   (is (= "only leading surrogate <U+D83D>"
          (escape-supp "only leading surrogate \uD83D")))
   (is (= (str "two consecutive "
-              (format "<U+%04X>" (int (.charAt MIN_LEADING_SURROGATE_STR 0)))
-              (format "<U+%04X>" (int (.charAt MAX_LEADING_SURROGATE_STR 0)))
+              (format "<U+%04X>" (int (.charAt ^String MIN_LEADING_SURROGATE_STR 0)))
+              (format "<U+%04X>" (int (.charAt ^String MAX_LEADING_SURROGATE_STR 0)))
               " leading surrogates")
          (escape-supp (str "two consecutive "
                            MIN_LEADING_SURROGATE_STR
                            MAX_LEADING_SURROGATE_STR
                            " leading surrogates"))))
   (is (= (str "two consecutive "
-              (format "<U+%04X>" (int (.charAt MIN_TRAILING_SURROGATE_STR 0)))
-              (format "<U+%04X>" (int (.charAt MAX_TRAILING_SURROGATE_STR 0)))
+              (format "<U+%04X>" (int (.charAt ^String MIN_TRAILING_SURROGATE_STR 0)))
+              (format "<U+%04X>" (int (.charAt ^String MAX_TRAILING_SURROGATE_STR 0)))
               " trailing surrogates")
            (escape-supp (str "two consecutive "
                              MIN_TRAILING_SURROGATE_STR
@@ -264,13 +282,13 @@
 
 
 (deftest test-codepoints
-  (is (= "61 300 1234 4567 1b1b 1d11e"
+  (is (= "61 300 1234 4567 1B1B 1D11E"
          (hex-codeunit-str
           (codepoints "a\u0300\u1234\u4567\u1b1b\ud834\udd1e"))))
-  (is (= "0 300 ffff 10000 10ffff 1d11e"
+  (is (= "0 300 FFFF 10000 10FFFF 1D11E"
          (hex-codeunit-str
           (codepoints "\u0000\u0300\uffff\ud800\udc00\udbff\udfff\ud834\udd1e"))))
-  (is (= "1f603 20 73 6d 69 6c 69 6e 67 20 66 61 63 65"
+  (is (= "1F603 20 73 6D 69 6C 69 6E 67 20 66 61 63 65"
          (hex-codeunit-str (codepoints "\uD83D\uDE03 smiling face")))))
 
 
@@ -493,7 +511,7 @@
     ;; single BMP character, or a sequence of them, using the \uxxxx
     ;; syntax to specify the codepoint, or by putting the exact
     ;; Unicode character into the pattern with re-pattern.
-    (is (= "61 300 1234 4567 1b1b d834 dd1e" (hex-codeunit-str s)))
+    (is (= "61 300 1234 4567 1B1B D834 DD1E" (hex-codeunit-str s)))
     (is (=   "61" (f #"\u0061")
            (f (re-pattern "\\u0061"))   ; equivalent to prev line
            (f (re-pattern  "\u0061")))) ; pattern has only 1 character, not 6
@@ -506,14 +524,14 @@
     (is (= "4567" (f #"\u4567")
            (f (re-pattern "\\u4567"))
            (f (re-pattern  "\u4567"))))
-    (is (= "1b1b" (f #"\u1b1b")
+    (is (= "1B1B" (f #"\u1b1b")
            (f (re-pattern "\\u1b1b"))
            (f (re-pattern  "\u1b1b"))))
 
     (is (= "61 300" (f #"\u0061\u0300")
            (f (re-pattern "\\u0061\\u0300"))
            (f (re-pattern  "\u0061\u0300"))))
-    (is (= "1234 4567 1b1b" (f #"\u1234\u4567\u1b1b")
+    (is (= "1234 4567 1B1B" (f #"\u1234\u4567\u1b1b")
            (f (re-pattern "\\u1234\\u4567\\u1b1b"))
            (f (re-pattern  "\u1234\u4567\u1b1b"))))
 
@@ -530,7 +548,7 @@
                   (f (re-pattern "\\ud834"))
                   (f (re-pattern  "\ud834"))))
     ;; test case B
-    (is (= "dd1e" (f #"\udd1e")
+    (is (= "DD1E" (f #"\udd1e")
            (f (re-pattern "\\udd1e"))))
     ;; test case C
     (is (=  nil   (f (re-pattern "\udd1e"))))
@@ -569,7 +587,7 @@
       ;; its meaning as that special character, and not be escaped.
       ;; That would best be mentioned in the documentation.
 
-      (is (= "d834 dd1e" (f #"\ud834\udd1e")
+      (is (= "D834 DD1E" (f #"\ud834\udd1e")
                          (f (re-pattern "\\ud834\\udd1e"))
                          (f (re-pattern "\\x{1D11E}"))))
 
@@ -579,11 +597,25 @@
                       (f (re-pattern "\\ud834\\udd1e"))))
         (is (thrown? PatternSyntaxException (f (re-pattern "\\x{1D11E}"))))))
     ;; test case E
-    (is (= "d834 dd1e" (f (re-pattern "\ud834\udd1e"))))
+    (is (= "D834 DD1E" (f (re-pattern "\ud834\udd1e"))))
 
     ;; It can find it by searching for the regex . at the end of the
     ;; string, which is good.
-    (is (= "d834 dd1e" (f #".$")))))
+    (is (= "D834 DD1E" (f #".$")))))
+
+
+;; Looks like the String constructor from an int array of codepoints
+;; allows even surrogates and 0xFFFE and 0xFFFF to be codepoints.
+(deftest ^:slow test-java-lang-string-constructor-invalid-codepoints
+  (let [a (int-array 1)]
+    (doseq [c (all-codepoints-with-surrogates)]
+      (aset a 0 (int c))
+      (let [s (String. a 0 1)]
+        (is (= (if (bmp-codepoint? c) 1 2) (count s))))))
+  (is (thrown? IllegalArgumentException
+               (String. (int-array 1 (dec Character/MIN_CODE_POINT)) 0 1)))
+  (is (thrown? IllegalArgumentException
+               (String. (int-array 1 (inc Character/MAX_CODE_POINT)) 0 1))))
 
 
 ;; The first element of each pair is the abbreviated "general
@@ -717,7 +749,7 @@
               (->> (all-codepoints)
                    ;; Create a map for each codepoint with some info
                    (map (fn [i] {:cp i
-                                 :java-enum-int-val (Character/getType i)
+                                 :java-enum-int-val (Character/getType (int i))
                                  :str (chr i)}))
 ;;                   ;; Skip over code points that are private or unassigned.
 ;;                   (remove (fn [m]
@@ -754,3 +786,35 @@
 ;;                (print-cp-info-line (last g)))))
           (flush)
           )))))
+
+(deftest ^:write-nfc-nfd-to-file
+  write-nfc-nfd-to-file
+  (let [fname "nfc-nfd-data.txt"]
+    (with-open [f (io/writer fname :encoding "UTF-8")]
+      (binding [*out* f]
+        (print-interesting-jvm-version-properties)
+        (printf "\n")
+        (let [normalized-forms
+              (->> (all-codepoints)
+                   (map (fn [i] {:cp i :str (chr i)}))
+                   (map (fn [m]
+                          (assoc m
+                            :nfc (Normalizer/normalize (:str m)
+                                                       java.text.Normalizer$Form/NFC)
+                            :nfd (Normalizer/normalize (:str m)
+                                                       java.text.Normalizer$Form/NFD)))))]
+          (printf "hex-codepoint;string S, containing that code point and nothing else;max # of codepoints in either NFC or NFD of S;hex-codepoints of NFC(S), if different from S, otherwise empty;NFC(S);hex-codepoints of NFD(S), if different from S, otherwise empty;NFD(S)\n")
+          (doseq [m normalized-forms]
+            (when (not (= (:str m) (:nfc m) (:nfd m)))
+              (printf "%06X;%s;%d;%s;%s;%s;%s\n" (:cp m)
+                      (:str m)
+                      (max (cp-count (:nfc m)) (cp-count (:nfd m)))
+                      (if (= (:str m) (:nfc m))
+                        "" (hex-codepoint-str (:nfc m)))
+                      (if (= (:str m) (:nfc m))
+                        "" (:nfc m))
+                      (if (= (:str m) (:nfd m))
+                        "" (hex-codepoint-str (:nfd m)))
+                      (if (= (:str m) (:nfd m))
+                        "" (:nfd m))
+                      ))))))))
