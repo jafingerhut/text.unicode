@@ -787,6 +787,94 @@
           (flush)
           )))))
 
+
+(defn legal-pattern
+  [s]
+  (try
+    (re-pattern s)
+    (catch PatternSyntaxException e nil)))
+
+
+;; WARNING: Running this test will fetch a file from the unicode.org
+;; web site. It is about 126 Kbytes in size, so not huge.
+
+(deftest ^:test-unicode-property-names test-unicode-property-names
+  (let [in-fname
+        "http://unicode.org/Public/4.0-Update/Scripts-4.0.0.txt"
+;        "http://unicode.org/Public/4.1.0/ucd/Scripts.txt"
+;        "http://unicode.org/Public/5.0.0/ucd/Scripts.txt"
+;        "http://unicode.org/Public/5.1.0/ucd/Scripts.txt"
+;        "http://unicode.org/Public/5.2.0/ucd/Scripts.txt"
+;        "http://unicode.org/Public/6.0.0/ucd/Scripts.txt"
+;        "http://unicode.org/Public/6.1.0/ucd/Scripts-6.1.0d13.txt"
+;        "/Users/andy/clj/UNIDATA/UCD/Scripts.txt"
+        out-fname "unicode-property-names-test-out.txt"]
+    (with-open [rdr (io/reader in-fname)
+                wr (io/writer out-fname :encoding "UTF-8")]
+      (binding [*out* wr]
+        (let [script-map
+              (->> (line-seq rdr)
+                   ;; Assign line numbers
+                   (map-indexed (fn [idx line]
+                                  {:line-num (inc idx) :line line}))
+                   ;; Remove comments beginning at first #, and ignore blank
+                   ;; or comment-only lines.
+                   (remove #(str/blank? (str/replace-first (:line %) #"#.*" "")))
+                   ;; Replace lines with map of info extracted from the line
+                   (map (fn [{:keys [line] :as m}]
+                          (if-let [[_ first-cp last-cp script-name]
+                                   (re-find #"(?x)
+                                      ^ \s*
+                                      ([0-9a-fA-F]+)         # first code point
+                                      (?:\.+([0-9a-fA-F]+))? # last code point
+                                                             # of a range
+                                      \s* ; \s*              # field separator
+                                      (\S+)                  # script name
+                                      "
+                                            line)]
+                            ;; add more fields to this line's map
+                            (merge m {:first-cp (Integer/parseInt first-cp 16),
+                                      :last-cp (Integer/parseInt
+                                                (or last-cp first-cp) 16),
+                                      :script-name script-name})
+                            ;; else just keep the original fields without adding any
+                            (do
+                              (printf "Unrecognized format on line %d: %s\n" (:line-num m) line)
+                              m))))
+                   (group-by :script-name))]
+          (doseq [script-name-prefix-in-re-pattern ["" "Is" "Script=" "In"]]
+            (printf "\n\nTry prefix \"%s\" before script name in regex pattern:\n"
+                    script-name-prefix-in-re-pattern)
+            (doseq [script-name (sort (keys script-map))]
+              (when script-name
+                (let [re-string (str "^\\p{" script-name-prefix-in-re-pattern
+                                     script-name "}$")]
+                  (if-let [pat (legal-pattern re-string)]
+                    (do
+                      (printf "Regex %s is legal\n" re-string)
+                      (let [cps (mapcat (fn [{:keys [first-cp last-cp]}]
+                                          (range first-cp (inc last-cp)))
+                                        (script-map script-name))
+                            non-matching-cps (remove #(re-find pat (chr %)) cps)]
+                        (printf "    %d / %d code points match, of those that should\n"
+                                (- (count cps) (count non-matching-cps))
+                                (count cps))
+;                        (printf "    Code points that should match, but don't:\n")
+;                        (printf "      %s\n"
+;                                (str/join "\n      " (map #(format "%06X" %)
+;                                                          non-matching-cps)))
+                        )
+;                    (doseq [{:keys [first-cp last-cp]}
+;                            (script-map script-name)]
+;                      (doseq [cp (range first-cp (inc last-cp))]
+;                        (let [s (chr cp)]
+;                          (when (not (re-find pat s))
+;                            (printf "    U+%06X should match, but doesn't\n" cp)))))
+                      )
+                    ;; else
+                    (printf "Regex %s is NOT legal\n" re-string)))))))))))
+
+
 (deftest ^:write-nfc-nfd-to-file
   write-nfc-nfd-to-file
   (let [fname "nfc-nfd-data.txt"]
