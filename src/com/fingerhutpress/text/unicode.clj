@@ -1,4 +1,5 @@
 (ns com.fingerhutpress.text.unicode
+  (:import (java.text Normalizer))
   (:require [clojure.string :as str]))
 
 (set! *warn-on-reflection* true)
@@ -39,7 +40,10 @@
 
    Repeatedly executes body, with name bound to the integer code point
    of each Unicode character in the string.  Handles Unicode
-   supplementary characters (U+10000 and above) correctly."
+   supplementary characters (U+10000 and above) correctly.
+
+   The behavior is undefined if the string is not valid UTF-16, as
+   determined by the function utf16?"
   [bindings & body]
   (assert (vector bindings))
   (assert (= 2 (count bindings)))
@@ -261,3 +265,79 @@
         (.append buffer replacement)
         (.appendCodePoint buffer c)))
     (.toString buffer)))
+
+
+(defn NFC
+  "Return a string that is in Unicode Normalization Form C (NFC),
+   by doing canonical decomposition, followed by canonical
+   composition, on the input string.
+
+   Every character that can be represented as either a single combined
+   Unicode code point (e.g. a Latin A with an acute accent), or as a
+   base character followed by one or more combining characters (e.g. a
+   Latin A character, followed by a combining character for an acute
+   accent), is turned into its decomposed form (e.g. the second form),
+   where the combining characters are sorted into a standard-specified
+   order, and then transformed into its composed form (e.g. like the
+   first example form).
+
+   For any two Unicode strings s1 and s2 that are canonically
+   equivalent, (= (NFC s1) (NFC s2)) will be true, even if (= s1 s2)
+   is false.
+
+   See also: http://unicode.org/reports/tr15/
+             http://en.wikipedia.org/wiki/Unicode_equivalence"
+  [^CharSequence s]
+  (Normalizer/normalize s java.text.Normalizer$Form/NFC))
+
+
+(defn NFD
+  "Return a string that is in Unicode Normalization Form D (NFD),
+   by doing canonical decomposition on the input string.
+
+   Every character that can be represented as either a single combined
+   Unicode code point (e.g. a Latin A with an acute accent), or as a
+   base character followed by one or more combining characters (e.g. a
+   Latin A character, followed by a combining character for an acute
+   accent), is turned into its decomposed form (e.g. the second form),
+   where the combining characters are sorted into a standard-specified
+   order.
+
+   For any two Unicode strings s1 and s2 that are canonically
+   equivalent, (= (NFD s1) (NFD s2)) will be true, even if (= s1 s2)
+   is false.
+
+   See also: http://unicode.org/reports/tr15/
+             http://en.wikipedia.org/wiki/Unicode_equivalence"
+  [^CharSequence s]
+  (Normalizer/normalize s java.text.Normalizer$Form/NFD))
+
+
+(defn NFKC
+  "Return a string that is in Unicode Normalization Form KC (NFKC),
+   by doing compatibility decomposition, followed by compatibility
+   composition, on the input string.
+
+   For any two Unicode strings s1 and s2 that are compatibility
+   equivalent, (= (NFKC s1) (NFKC s2)) will be true, even if (= s1 s2)
+   is false.
+
+   See also: http://unicode.org/reports/tr15/
+             http://en.wikipedia.org/wiki/Unicode_equivalence"
+  [^CharSequence s]
+  (Normalizer/normalize s java.text.Normalizer$Form/NFKC))
+
+
+(defn NFKD
+  "Return a string that is in Unicode Normalization Form KD (NFKD),
+   by doing compatibility decomposition, followed by compatibility
+   composition, on the input string.
+
+   For any two Unicode strings s1 and s2 that are compatibility
+   equivalent, (= (NFKD s1) (NFKD s2)) will be true, even if (= s1 s2)
+   is false.
+
+   See also: http://unicode.org/reports/tr15/
+             http://en.wikipedia.org/wiki/Unicode_equivalence"
+  [^CharSequence s]
+  (Normalizer/normalize s java.text.Normalizer$Form/NFKD))

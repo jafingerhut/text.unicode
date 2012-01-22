@@ -1,8 +1,7 @@
 (ns com.fingerhutpress.text.unicode.test
   (:use [com.fingerhutpress.text.unicode])
   (:use [clojure.test])
-  (:import (java.util.regex PatternSyntaxException)
-           (java.text Normalizer))
+  (:import (java.util.regex PatternSyntaxException))
   (:require [clojure.string :as str]
             [clojure.set :as set]
             [clojure.java.io :as io]
@@ -823,13 +822,16 @@
         ;; Mac OS X 10.6.8, the \p{InFoo} syntax in a regular
         ;; expression appears to correspond almost exactly with the
         ;; Block specifications from Blocks.txt in Unicode 4.1.0.  The
-        ;; only difference is that there are a few Block names in this
-        ;; Blocks.txt file that are not supported by this JVM.
+        ;; only difference is that there are a few Block names in that
+        ;; version of the Blocks.txt file that are not supported by
+        ;; this JVM.
         
-        ;; The Scripts.txt file above specifies script names, many of
-        ;; which correspond with Block names, but specify very
+        ;; The Scripts.txt files above specifies script names, many of
+        ;; which have the same name as Block names, but specify very
         ;; different sets of characters.
-        "/Users/andy/clj/www.unicode.org/Public/zipped/4.1.0/UCD/Blocks.txt"
+        "http://unicode.org/Public/4.1.0/ucd/Blocks.txt"
+        ;; local copy on my machine:
+        ;; "/Users/andy/clj/www.unicode.org/Public/zipped/4.1.0/UCD/Blocks.txt"
 
         out-fname "unicode-property-names-test-out.txt"
         num-all-cps (count (all-codepoints))]
@@ -925,9 +927,9 @@
                     (printf "Regex %s is NOT legal\n" re-string)))))))))))
 
 
-(deftest ^:write-nfc-nfd-to-file
-  write-nfc-nfd-to-file
-  (let [fname "nfc-nfd-data.txt"]
+(deftest ^:write-normalized-forms-to-file
+  write-normalized-forms-to-file
+  (let [fname "normalized-form-data.txt"]
     (with-open [f (io/writer fname :encoding "UTF-8")]
       (binding [*out* f]
         (print-interesting-jvm-version-properties)
@@ -935,24 +937,49 @@
         (let [normalized-forms
               (->> (all-codepoints)
                    (map (fn [i] {:cp i :str (chr i)}))
-                   (map (fn [m]
-                          (assoc m
-                            :nfc (Normalizer/normalize (:str m)
-                                                       java.text.Normalizer$Form/NFC)
-                            :nfd (Normalizer/normalize (:str m)
-                                                       java.text.Normalizer$Form/NFD)))))]
-          (printf "hex-codepoint;string S, containing that code point and nothing else;max # of codepoints in either NFC or NFD of S;hex-codepoints of NFC(S), if different from S, otherwise empty;NFC(S);hex-codepoints of NFD(S), if different from S, otherwise empty;NFD(S)\n")
+                   (map (fn [m] (assoc m
+                                  :nfc (NFC (:str m))
+                                  :nfd (NFD (:str m))
+                                  :nfkc (NFKC (:str m))
+                                  :nfkd (NFKD (:str m))))))]
+          (printf "hex-codepoint
+;string S, containing that code point and nothing else
+;max # of codepoints in either NFC or NFD of S
+;hex-codepoints of NFC(S), if different from S, otherwise empty
+;NFC(S)
+;hex-codepoints of NFD(S), if different from S, otherwise empty
+;NFD(S)
+;max # of codepoints in either NFKC or NFKD of S
+;hex-codepoints of NFKC(S), if different from S, otherwise empty
+;NFKC(S)
+;hex-codepoints of NFKD(S), if different from S, otherwise empty
+;NFKD(S)
+
+")
           (doseq [m normalized-forms]
-            (when (not (= (:str m) (:nfc m) (:nfd m)))
-              (printf "%06X;%s;%d;%s;%s;%s;%s\n" (:cp m)
-                      (:str m)
-                      (max (cp-count (:nfc m)) (cp-count (:nfd m)))
-                      (if (= (:str m) (:nfc m))
-                        "" (hex-codepoint-str (:nfc m)))
-                      (if (= (:str m) (:nfc m))
-                        "" (:nfc m))
-                      (if (= (:str m) (:nfd m))
-                        "" (hex-codepoint-str (:nfd m)))
-                      (if (= (:str m) (:nfd m))
-                        "" (:nfd m))
-                      ))))))))
+            (when (not (= (:str m) (:nfc m) (:nfd m) (:nfkc m) (:nfkd m)))
+              (printf "%s"
+               (str (format "%06X" (:cp m))
+                    (format ";%s" (:str m))
+                    (format ";%d" (max (cp-count (:nfc m)) (cp-count (:nfd m))))
+                    (format ";%s" (if (= (:str m) (:nfc m))
+                                    "" (hex-codepoint-str (:nfc m))))
+                    (format ";%s" (if (= (:str m) (:nfc m))
+                                    "" (:nfc m)))
+                    (format ";%s" (if (= (:str m) (:nfd m))
+                                    "" (hex-codepoint-str (:nfd m))))
+                    (format ";%s" (if (= (:str m) (:nfd m))
+                                    "" (:nfd m)))
+
+                    (format ";%d" (max (cp-count (:nfkc m)) (cp-count (:nfkd m))))
+                    (format ";%s" (if (= (:str m) (:nfkc m))
+                                    "" (hex-codepoint-str (:nfkc m))))
+                    (format ";%s" (if (= (:str m) (:nfkc m))
+                                    "" (:nfkc m)))
+                    (format ";%s" (if (= (:str m) (:nfkd m))
+                                    "" (hex-codepoint-str (:nfkd m))))
+                    (format ";%s" (if (= (:str m) (:nfkd m))
+                                    "" (:nfkd m)))
+                    "\n")
+
+               ))))))))
