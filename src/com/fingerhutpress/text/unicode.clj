@@ -5,8 +5,9 @@
 (set! *warn-on-reflection* true)
 
 
-(defn bmp-codepoint? [c]
-  (and (<= 0 c) (< c Character/MIN_SUPPLEMENTARY_CODE_POINT)))
+(defmacro bmp-codepoint? [c]
+  `(let [cp# ~c]
+     (and (<= 0 cp#) (< cp# Character/MIN_SUPPLEMENTARY_CODE_POINT))))
 
 
 ;; codepoints is a slight adaptation from a function of the same name
@@ -237,6 +238,123 @@
        (cp-subs-helper s start end)
        (catch IndexOutOfBoundsException e
            (throw (StringIndexOutOfBoundsException.))))))
+
+
+(defmacro combining-cp? [cp]
+  `(let [t# (Character/getType (int ~cp))]
+     (or (== t# (int Character/NON_SPACING_MARK))
+         (== t# (int Character/COMBINING_SPACING_MARK))
+         (== t# (int Character/ENCLOSING_MARK)))))
+
+
+(defmacro cp-at
+  "Return integer codepoint of character beginning at index idx of s,
+   if it lies completely within the string s.  Return :eos if idx is
+   exactly at end of string, :past-eos if idx is larger than len,
+   or :incomplete-supplementary-char if there is a high surrogate at
+   the end of the string, with nothing after it.
+
+   len is simply (.length s).  It is included as an argument since
+   where it is used the length has already been extracted, and it is
+   expected that it is faster to use the already-extracted length
+   rather than invoking the method repeatedly."
+  [^String s len idx]
+  `(cond (== ~idx ~len) :eos
+         (> ~idx ~len) :past-eos
+         (Character/isHighSurrogate (.charAt ~s ~idx))
+         (if (< (inc ~idx) ~len)
+           (.codePointAt ~s ~idx)
+           :incomplete-supplementary-char)
+         :else (.codePointAt ~s ~idx)))
+
+
+(defmacro cp-num-chars
+  "Return the number of Java chars, which is the number of UTF-16 code
+   units, required to encode the code point cp."
+  [cp]
+  `(if (bmp-codepoint? ~cp) 1 2))
+
+
+(defn- find-ccs-idx
+  [^String s len start-idx start-ccs-count target-ccs-count]
+  (if (== start-ccs-count target-ccs-count)
+    ;; Already done.  Return immediately.
+    start-idx
+    
+    ;; Special case: If first character is combining character,
+    ;; pretend that we already saw a combining character earlier by
+    ;; incrementing ccs-count.  We have to check for the case that
+    ;; there is no first character while we are doing this.  Implement
+    ;; this by skipping over the first character and using (inc
+    ;; start-ccs-count), whether the first character is combining or
+    ;; not.
+    (let [first-cp (cp-at s len start-idx)]
+      (if (not (number? first-cp))
+        (throw (StringIndexOutOfBoundsException.))
+        (loop [i (+ start-idx (cp-num-chars first-cp))
+               ccs-count (inc start-ccs-count)]
+          (let [cp (cp-at s len i)]
+            (cond
+             (= cp :eos)
+             (if (== ccs-count target-ccs-count)
+               i
+               (throw (StringIndexOutOfBoundsException.)))
+             
+             (number? cp)
+             (cond
+              (combining-cp? cp) (recur (+ i (cp-num-chars cp)) ccs-count)
+              (== ccs-count target-ccs-count) i
+              :else (recur (+ i (cp-num-chars cp)) (inc ccs-count)))
+             
+             :else (throw (StringIndexOutOfBoundsException.)))))))))
+
+
+;; TBD: Add a ccs-count function that calculates the number of CCSs in
+;; a string.  If we use the same simple rule for defining a CCS as
+;; used in ccs-subs, this is as simple as counting all of the
+;; characters that match \PM in the string, plus 1 if there is a
+;; leading substring that matches \pM+.
+
+;; Creating a version of ccs-count for a more Unicode-standard version
+;; of a CCS is likely trickier.
+
+(defn ^String ccs-subs
+  "Returns the substring of s beginning at start inclusive, and ending
+   at end (defaults to the end of the string), exclusive.
+
+   Unlike subs, the start and end indices are in units of Unicode
+   combining character sequences (CCSs), not UTF-16 code units (i.e.,
+   Java chars).
+
+   For the purposes of this function, a CCS is any character except a
+   combining mark character, followed by 0 or more combining mark
+   characters.  That is, it matches the regular expression:
+
+      \\PM\\pM*
+
+   This is not precisely the definition of a CCS in the Unicode 6.0.0
+   standard, but may be close enough for some purposes.
+
+   If s begins with one or more combining mark characters, all of them
+   up to, but not including, the first non-combining mark character,
+   will count as the first CCS, with index 0.
+
+   If s is a valid UTF-16 string, and start and end are in the proper
+   range, the return value is guaranteed to be a valid UTF-16 string."
+  ([^CharSequence s start]
+     (if (neg? start)
+       (throw (StringIndexOutOfBoundsException.))
+       (let [len (.length s)
+             start-idx (find-ccs-idx s len 0 0 start)]
+         (subs s start-idx))))
+  ([^CharSequence s start end]
+     (if (<= 0 start end)
+       (let [len (.length s)
+             start-idx (find-ccs-idx s len 0 0 start)
+             ;; continue looking for end-idx from where we left off
+             end-idx (find-ccs-idx s len start-idx start end)]
+         (subs s start-idx end-idx))
+       (throw (StringIndexOutOfBoundsException.)))))
 
 
 (defn ^String cp-escape

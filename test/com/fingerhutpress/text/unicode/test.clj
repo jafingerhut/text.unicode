@@ -475,6 +475,102 @@
       (is (thrown? StringIndexOutOfBoundsException (cp-subs s 0 (inc n)))))))
 
 
+(defn ^String ccs-subs-slow?
+  ([^CharSequence s start]
+     (cond (neg? start)
+           (throw (StringIndexOutOfBoundsException.))
+           (zero? start)
+           s
+           :else
+           (let [pat (re-pattern
+                      (str "^(?:.\\pM*)"
+                           (if (== start 1)
+                             ""
+                             (str "(?:\\PM\\pM*){" (dec start) "}"))))]
+             ;;(printf "ccs-subs-slow pat='%s'\n" (str pat)) (flush)
+             (if-let [remove (re-find pat s)]
+               (subs s (count remove))
+               (throw (StringIndexOutOfBoundsException.))))))
+  ([^CharSequence s start end]
+     (cond (or (neg? start) (< end start))
+           (throw (StringIndexOutOfBoundsException.))
+           (= start end)
+           ""
+           (zero? start)
+           (let [pat (re-pattern
+                      (str "^(?:.\\pM*)"
+                           (if (== end 1)
+                             ""
+                             (str "(?:\\PM\\pM*){" (dec end) "}"))))]
+             ;;(printf "ccs-subs-slow pat='%s'\n" (str pat)) (flush)
+             (if-let [s1 (re-find pat s)]
+               s1
+               (throw (StringIndexOutOfBoundsException.))))
+           :else    ;; 1 <= start < end
+           (let [pat (re-pattern
+                      (str "^(?:.\\pM*)"
+                           (if (== start 1)
+                             ""
+                             (str "(?:\\PM\\pM*){" (dec start) "}"))
+                           "((?:\\PM\\pM*){" (- end start) "})"))]
+             ;;(printf "ccs-subs-slow pat='%s'\n" (str pat)) (flush)
+             (if-let [[_ s1] (re-find pat s)]
+               s1
+               (throw (StringIndexOutOfBoundsException.)))))))
+
+
+(deftest test-ccs-subs
+  (let [ccs-cp-lists
+        [
+         [ 0xe007f ]  ; CANCEL TAG + 0 combining chars
+         [ 0x0020 0x6df ]  ; SPACE + 1 combining char
+         [ 0xa07b 0x1d1ad ]  ; YI SYLLABLE NBIE + 1 combining char
+         [ 0x0041 0x0300 0x0309 ] ; A + 2 combining chars
+         [ 0x10000 0x651 0xfb1e 0xe01ef ] ; LINEAR B SYLLABLE + 3 combining
+         ]
+        ccss (vec (map (fn [cp-list] (apply str (map chr cp-list)))
+                       ccs-cp-lists))
+
+        ccs-vec1 [ (ccss 0) (ccss 1) (ccss 2) (ccss 3) (ccss 4) ]
+        ccs-vec2 [ (ccss 1) (ccss 2) (ccss 3) (ccss 4) ]
+        ccs-vec3 [ (cp-subs (ccss 1) 1)  ; first 1 char is combining char
+                   (ccss 2) (ccss 3) (ccss 4) ]
+        ccs-vec3 [ (cp-subs (ccss 4) 1)  ; first 3 chars are combining chars
+                   (ccss 2) (ccss 3) (ccss 0) ]
+        ]
+    (doseq [ccs-vec [ ccs-vec1 ccs-vec2 ccs-vec3 ]]
+      (let [num-ccs (count ccs-vec)
+            s (apply str ccs-vec)]
+        ;;(printf "\n")
+        (doseq [start (range 0 (inc num-ccs))
+                end (range start (inc num-ccs))]
+;;          (printf "start=%d end=%d (cp-count (ccs-subs s start end))=%d\n"
+;;                  start end (cp-count (ccs-subs s start end))) (flush)
+          (is (= (ccs-subs s start end)
+                 (ccs-subs-slow? s start end)
+                 (apply str (subvec ccs-vec start end)))))
+        (doseq [start (range 0 (inc num-ccs))]
+          ;;(printf "start=%d end=none\n" start) (flush)
+          (is (= (ccs-subs s start)
+                 (ccs-subs-slow? s start)
+                 (apply str (subvec ccs-vec start))))
+          ;;(printf "start=%d end=%d should be exception\n" start (inc num-ccs)) (flush)
+          (is (thrown? StringIndexOutOfBoundsException
+                       (ccs-subs s start (inc num-ccs))))
+          ;;(printf "start=%d end=%d should be exception\n" start (inc num-ccs)) (flush)
+          (is (thrown? StringIndexOutOfBoundsException
+                       (ccs-subs-slow? s start (inc num-ccs))))
+          )
+        (is (thrown? StringIndexOutOfBoundsException
+                     (ccs-subs s (inc num-ccs))))
+        (is (thrown? StringIndexOutOfBoundsException
+                     (ccs-subs-slow? s (inc num-ccs))))
+        (is (thrown? StringIndexOutOfBoundsException
+                     (ccs-subs s (inc num-ccs) (+ num-ccs 2))))
+        (is (thrown? StringIndexOutOfBoundsException
+                     (ccs-subs-slow? s (inc num-ccs) (+ num-ccs 2))))))))
+
+
 (defn cp-escape-slow [s cmap]
   (let [strmap (reduce (fn [m [cp x]]
                          (assoc m (chr cp) x))
@@ -747,7 +843,7 @@
 
 
 (deftest ^:write-char-types-to-file write-char-types-to-file
-  (let [fname "char-type-data.txt"]
+  (let [fname "char-categories.txt"]
     (with-open [f (io/writer fname :encoding "UTF-8")]
       (binding [*out* f]
         (print-interesting-jvm-version-properties)
