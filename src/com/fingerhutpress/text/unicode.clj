@@ -5,6 +5,31 @@
 (set! *warn-on-reflection* true)
 
 
+(defn ^String chr
+  "Return a string containing only the one specified Unicode code point,
+   although it may contain 1 or 2 UTF-16 code units.
+
+   Warning: Will return an invalid UTF-16 string containing only a
+   leading or trailing surrogate if you give it a codepoint in the
+   surrogate range, 0xD800 through 0xDFFF."
+  [codepoint]
+  (String. (Character/toChars codepoint)))
+
+
+(defn ord
+  "Return the Unicode code point of the first character in string s.
+   If the first character is a UTF-16 surrogate pair, the code point
+   returned is that of the pair, not of the leading surrogate.  Return
+   0 if the string is empty.
+
+   The behavior is undefined if the string is not valid UTF-16."
+  [^CharSequence s]
+  (let [s (.toString s)]
+    (if (= s "")   ; special case for Perl compatability
+      0
+      (.codePointAt s 0))))
+
+
 (defmacro bmp-codepoint? [c]
   `(let [cp# ~c]
      (and (<= 0 cp#) (< cp# Character/MIN_SUPPLEMENTARY_CODE_POINT))))
