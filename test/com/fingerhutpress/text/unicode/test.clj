@@ -239,6 +239,29 @@
   )
 
 
+(deftest test-bad-surrogate-at-either-end?
+  (let [f (fn [expected-answer s]
+            (= expected-answer (bad-surrogate-at-either-end? s)))]
+    (doseq [s valid-utf16-strings]
+      (is (f false s)))
+    (is (f false "\u0300 combining grave accent (not a surrogate)"))
+    (is (f false "\uD83D only leading surrogate"))
+    (is (f true "\uD83D"))
+    (is (f true "\uDE03 only trailing surrogate"))
+    (is (f true "\uDE03"))
+    (is (f false "\uD83D\uDE03"))
+    (is (f true "only leading surrogate \uD83D"))
+    (is (f false (str "two consecutive "
+                      MIN_LEADING_SURROGATE_STR
+                      MAX_LEADING_SURROGATE_STR
+                      " leading surrogates")))
+    (is (f false (str "two consecutive "
+                      MIN_TRAILING_SURROGATE_STR
+                      MAX_TRAILING_SURROGATE_STR
+                      " trailing surrogates")))
+    ))
+
+
 (deftest test-escape-supp
   (doseq [s valid-utf16-strings]
     (if (contains-supp? s)

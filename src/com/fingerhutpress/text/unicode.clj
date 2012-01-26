@@ -120,6 +120,23 @@
   (nil? (first-utf16-error s)))
 
 
+(defn bad-surrogate-at-either-end?
+  "Return true if s is not empty, and either begins with a trailing
+   surrogate (aka low surrogate), or ends with a leading
+   surrogate (aka high surrogate).  Intended for use as a quick
+   error-catching mechanism when a substring of a UTF-16 encoded
+   string is taken with a bad start or end location that splits up a
+   surrogate pair.  To be quick, it intentionally does not scan the
+   entire string the way first-utf16-error or utf16? do, but only
+   checks the ends."
+  [^CharSequence s]
+  (cond
+   (= s "") false
+   (Character/isLowSurrogate (.charAt s 0)) true
+   (Character/isHighSurrogate (.charAt s (dec (.length s)))) true
+   :else false))
+
+
 (defn ^String escape-supp
   "Return a new string, replacing Unicode supplementary characters (or
    code points), which require 2 Java chars to represent, with a
