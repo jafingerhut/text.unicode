@@ -46,6 +46,22 @@
 ;; are effectively unit tests for the chr function.
 
 (deftest test-chr
+  (is (= "A" (chr 65)))
+  (is (= '( "\n" "\r" "\t" ) (map chr [10 13 9])))
+  (is (= "The quick brown fox jumped over the lazy dog"
+         (apply str (map chr [84 104 101 32 113 117 105 99 107 32 98
+                              114 111 119 110 32 102 111 120 32 106
+                              117 109 112 101 100 32 111 118 101 114
+                              32 116 104 101 32 108 97 122 121 32 100
+                              111 103]))))
+  (is (= "\ud834\udd1e" (chr 0x1d11e)))
+  (is (= "\ud83d\ude03 smiling face"
+         (apply str (map chr [0x1f603 32 115 109 105 108 105 110 103 32 102
+                              97 99 101]))))
+  (is (thrown? IllegalArgumentException (chr -1)))
+  (is (thrown? IllegalArgumentException (chr (inc Character/MAX_CODE_POINT))))
+  (is (thrown? IllegalArgumentException (chr (Integer/MAX_VALUE))))
+  (is (thrown? IllegalArgumentException (chr (Integer/MIN_VALUE))))
   (= "\u0000" MIN_CODE_POINT_STR)
   (= "\uffff" MAX_BMP_CODE_POINT_STR)
   (= "\ud800\udc00" MIN_SUPPLEMENTARY_CODE_POINT_STR)
