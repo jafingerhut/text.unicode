@@ -168,8 +168,10 @@
 
 (deftest ^:slow test-ord-slow
   (doseq [i (all-codepoints)]
-    (is (= i (ord (chr i))))
-    (is true (utf16? (chr i)))))
+    (let [s (chr i)]
+      (is (= i (ord s)))
+      (is (= s (format "%c" (Integer. (int i)))))
+      (is (= true (utf16? s))))))
 
 
 (deftest test-bmp-codepoint?
