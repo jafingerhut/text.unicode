@@ -5,9 +5,11 @@
                                          (not (:char-types m))
                                          (not (:normalized-forms m))
                                          (not (:property-names m))
+                                         (not (:whitespace m))
                                          ))
                    :slow :slow
                    :char-types :char-types
                    :normalized-forms :normalized-forms
                    :property-names :property-names
+                   :whitespace :whitespace
                    :all (fn [m] true)})
