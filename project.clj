@@ -1,6 +1,6 @@
 (defproject com.fingerhutpress.text.unicode "0.1.0"
   :description "Some Clojure functions & macros for dealing with Unicode strings."
-  :dependencies [[org.clojure/clojure "1.3.0"]]
+  :dependencies [[org.clojure/clojure "1.5.1"]]
   :test-selectors {:default (fn [m] (and (not (:slow m))
                                          (not (:write-char-types-to-file m))
                                          (not (:write-normalized-forms-to-file m))

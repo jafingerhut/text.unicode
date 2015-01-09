@@ -1,5 +1,5 @@
 (ns com.fingerhutpress.text.unicode.test
-  (:use [com.fingerhutpress.text.unicode])
+  (:require [com.fingerhutpress.text.unicode :as u])
   (:use [clojure.test])
   (:import (java.util.regex PatternSyntaxException))
   (:require [clojure.string :as str]
@@ -20,18 +20,18 @@
 
 ;; Some interesting boundary values, as strings.
 (def MIN_CODE_POINT_STR
-     (chr Character/MIN_CODE_POINT))                ; U+0000
-(def MAX_BMP_CODE_POINT_STR (chr 0xFFFF))
+     (u/chr Character/MIN_CODE_POINT))                ; U+0000
+(def MAX_BMP_CODE_POINT_STR (u/chr 0xFFFF))
 (def MIN_SUPPLEMENTARY_CODE_POINT_STR
-     (chr Character/MIN_SUPPLEMENTARY_CODE_POINT))  ; U+10000
+     (u/chr Character/MIN_SUPPLEMENTARY_CODE_POINT))  ; U+10000
 (def MAX_CODE_POINT_STR
-     (chr Character/MAX_CODE_POINT))                ; U+10FFFF
+     (u/chr Character/MAX_CODE_POINT))                ; U+10FFFF
 
 ;; Some arbitrarily chosen supplementary characters to use in testing.
-(def COMBINING_GRAVE_ACCENT_STR (chr 0x0300))
-(def MUSICAL_SYMBOL_G_CLEF_STR (chr 0x1D11E))
-(def SMILING_FACE_WITH_OPEN_MOUTH_STR (chr 0x1F603))
-(def BABY_ANGEL_STR (chr 0x1F47C))
+(def COMBINING_GRAVE_ACCENT_STR (u/chr 0x0300))
+(def MUSICAL_SYMBOL_G_CLEF_STR (u/chr 0x1D11E))
+(def SMILING_FACE_WITH_OPEN_MOUTH_STR (u/chr 0x1F603))
+(def BABY_ANGEL_STR (u/chr 0x1F47C))
 
 ;; Not valid UTF-16 strings, since they only contain a single
 ;; surrogate character.  Useful for building up other test cases of
@@ -42,38 +42,38 @@
 (def MAX_TRAILING_SURROGATE_STR (str Character/MAX_LOW_SURROGATE))
 
 
-;; Because the value of these symbols were calculated using chr, these
-;; are effectively unit tests for the chr function.
+;; Because the value of these symbols were calculated using u/chr, these
+;; are effectively unit tests for the u/chr function.
 
 (deftest test-chr
-  (is (= "A" (chr 65)))
-  (is (= '( "\n" "\r" "\t" ) (map chr [10 13 9])))
+  (is (= "A" (u/chr 65)))
+  (is (= '( "\n" "\r" "\t" ) (map u/chr [10 13 9])))
   (is (= "The quick brown fox jumped over the lazy dog"
-         (apply str (map chr [84 104 101 32 113 117 105 99 107 32 98
-                              114 111 119 110 32 102 111 120 32 106
-                              117 109 112 101 100 32 111 118 101 114
-                              32 116 104 101 32 108 97 122 121 32 100
-                              111 103]))))
-  (is (= "\ud834\udd1e" (chr 0x1d11e)))
+         (apply str (map u/chr [84 104 101 32 113 117 105 99 107 32 98
+                                114 111 119 110 32 102 111 120 32 106
+                                117 109 112 101 100 32 111 118 101 114
+                                32 116 104 101 32 108 97 122 121 32 100
+                                111 103]))))
+  (is (= "\ud834\udd1e" (u/chr 0x1d11e)))
   (is (= "\ud83d\ude03 smiling face"
-         (apply str (map chr [0x1f603 32 115 109 105 108 105 110 103 32 102
-                              97 99 101]))))
-  (is (thrown? IllegalArgumentException (chr -1)))
-  (is (thrown? IllegalArgumentException (chr (inc Character/MAX_CODE_POINT))))
-  (is (thrown? IllegalArgumentException (chr (Integer/MAX_VALUE))))
-  (is (thrown? IllegalArgumentException (chr (Integer/MIN_VALUE))))
-  (= "\u0000" MIN_CODE_POINT_STR)
-  (= "\uffff" MAX_BMP_CODE_POINT_STR)
-  (= "\ud800\udc00" MIN_SUPPLEMENTARY_CODE_POINT_STR)
-  (= "\udbff\udfff" MAX_CODE_POINT_STR)
-  (= "\u0300" COMBINING_GRAVE_ACCENT_STR)
-  (= "\ud834\udd1e" MUSICAL_SYMBOL_G_CLEF_STR)
-  (= "\ud83d\ude03" SMILING_FACE_WITH_OPEN_MOUTH_STR)
-  (= "\ud83d\udc7c" BABY_ANGEL_STR))
+         (apply str (map u/chr [0x1f603 32 115 109 105 108 105 110 103 32 102
+                                97 99 101]))))
+  (is (thrown? IllegalArgumentException (u/chr -1)))
+  (is (thrown? IllegalArgumentException (u/chr (inc Character/MAX_CODE_POINT))))
+  (is (thrown? IllegalArgumentException (u/chr (Integer/MAX_VALUE))))
+  (is (thrown? IllegalArgumentException (u/chr (Integer/MIN_VALUE))))
+  (is (= "\u0000" MIN_CODE_POINT_STR))
+  (is (= "\uffff" MAX_BMP_CODE_POINT_STR))
+  (is (= "\ud800\udc00" MIN_SUPPLEMENTARY_CODE_POINT_STR))
+  (is (= "\udbff\udfff" MAX_CODE_POINT_STR))
+  (is (= "\u0300" COMBINING_GRAVE_ACCENT_STR))
+  (is (= "\ud834\udd1e" MUSICAL_SYMBOL_G_CLEF_STR))
+  (is (= "\ud83d\ude03" SMILING_FACE_WITH_OPEN_MOUTH_STR))
+  (is (= "\ud83d\udc7c" BABY_ANGEL_STR)))
 
 
 (deftest test-ord-quick
-  (are [i] (= i (ord (chr i)))
+  (are [i] (= i (u/ord (u/chr i)))
        Character/MIN_CODE_POINT
        (dec (int Character/MIN_HIGH_SURROGATE))
        (inc (int Character/MAX_LOW_SURROGATE))
@@ -128,7 +128,7 @@
 
 
 (defn cp-to-utf16 [codepoint]
-  (if (bmp-codepoint? codepoint)
+  (if (u/bmp-codepoint? codepoint)
     [ codepoint ]
     (let [v (- codepoint Character/MIN_SUPPLEMENTARY_CODE_POINT)  ; 0x10000
           vh (bit-shift-right v 10)
@@ -151,7 +151,7 @@
 
 (defn hex-cp
   [cp]
-  (if (bmp-codepoint? cp)
+  (if (u/bmp-codepoint? cp)
     (format "%04X" cp)
     (format "%06X" cp)))
 
@@ -163,29 +163,29 @@
    characters that do not show up in your system's default font."
   [s]
   (if s
-    (str/join " " (map #(format "%X" %) (codepoints s)))))
+    (str/join " " (map #(format "%X" %) (u/codepoints s)))))
 
 
 (deftest ^:slow test-ord-slow
   (doseq [i (all-codepoints)]
-    (let [s (chr i)]
-      (is (= i (ord s)))
+    (let [s (u/chr i)]
+      (is (= i (u/ord s)))
       (is (= s (format "%c" (Integer. (int i)))))
-      (is (= true (utf16? s))))))
+      (is (= true (u/utf16? s))))))
 
 
 (deftest test-bmp-codepoint?
-  (is (= true (bmp-codepoint? 0)))
-  (is (= true (bmp-codepoint? 0xffff)))
-  (is (= false (bmp-codepoint? 0x10000)))
-  (is (= false (bmp-codepoint? -1))))
+  (is (= true (u/bmp-codepoint? 0)))
+  (is (= true (u/bmp-codepoint? 0xffff)))
+  (is (= false (u/bmp-codepoint? 0x10000)))
+  (is (= false (u/bmp-codepoint? -1))))
 
 
 (deftest ^:slow test-2-bmp-codepoint?
   (doseq [i (bmp-codepoints)]
-    (is (= true (bmp-codepoint? i))))
+    (is (= true (u/bmp-codepoint? i))))
   (doseq [i (supplementary-codepoints)]
-    (is (= false (bmp-codepoint? i)))))
+    (is (= false (u/bmp-codepoint? i)))))
 
 
 (def valid-utf16-strings
@@ -207,31 +207,31 @@
 
 (deftest test-first-utf16-error
   (doseq [s valid-utf16-strings]
-    (is (= nil (first-utf16-error s))))
+    (is (= nil (u/first-utf16-error s))))
   (is (= nil
-         (first-utf16-error "\u0300 combining grave accent (not a surrogate)")))
+         (u/first-utf16-error "\u0300 combining grave accent (not a surrogate)")))
   (is (= [0 :orphan-leading-surrogate]
-           (first-utf16-error "\uD83D only leading surrogate")))
+           (u/first-utf16-error "\uD83D only leading surrogate")))
   (is (= [0 :orphan-trailing-surrogate]
-           (first-utf16-error "\uDE03 only trailing surrogate")))
+           (u/first-utf16-error "\uDE03 only trailing surrogate")))
   (is (= [23 :orphan-leading-surrogate]
-           (first-utf16-error "only leading surrogate \uD83D")))
+           (u/first-utf16-error "only leading surrogate \uD83D")))
   (is (= [16 :orphan-leading-surrogate]
-           (first-utf16-error (str "two consecutive "
-                                   MIN_LEADING_SURROGATE_STR
-                                   MAX_LEADING_SURROGATE_STR
-                                   " leading surrogates"))))
+           (u/first-utf16-error (str "two consecutive "
+                                     MIN_LEADING_SURROGATE_STR
+                                     MAX_LEADING_SURROGATE_STR
+                                     " leading surrogates"))))
   (is (= [16 :orphan-trailing-surrogate]
-           (first-utf16-error (str "two consecutive "
-                                   MIN_TRAILING_SURROGATE_STR
-                                   MAX_TRAILING_SURROGATE_STR
-                                   " trailing surrogates"))))
+           (u/first-utf16-error (str "two consecutive "
+                                     MIN_TRAILING_SURROGATE_STR
+                                     MAX_TRAILING_SURROGATE_STR
+                                     " trailing surrogates"))))
   )
 
 
 (deftest test-bad-surrogate-at-either-end?
   (let [f (fn [expected-answer s]
-            (= expected-answer (bad-surrogate-at-either-end? s)))]
+            (= expected-answer (u/bad-surrogate-at-either-end? s)))]
     (doseq [s valid-utf16-strings]
       (is (f false s)))
     (is (f false "\u0300 combining grave accent (not a surrogate)"))
@@ -254,47 +254,47 @@
 
 (deftest test-escape-supp
   (doseq [s valid-utf16-strings]
-    (if (contains-supp? s)
+    (if (u/contains-supp? s)
       ;; Replace supplementary characters that might be there with
       ;; their escapes using a different slower method.
       (let [s2 (-> s
                    (str/replace (re-pattern MUSICAL_SYMBOL_G_CLEF_STR)
-                                (format "<U+%06X>" (ord MUSICAL_SYMBOL_G_CLEF_STR)))
+                                (format "<U+%06X>" (u/ord MUSICAL_SYMBOL_G_CLEF_STR)))
                    (str/replace (re-pattern SMILING_FACE_WITH_OPEN_MOUTH_STR)
-                                (format "<U+%06X>" (ord SMILING_FACE_WITH_OPEN_MOUTH_STR)))
+                                (format "<U+%06X>" (u/ord SMILING_FACE_WITH_OPEN_MOUTH_STR)))
                    (str/replace (re-pattern BABY_ANGEL_STR)
-                                (format "<U+%06X>" (ord BABY_ANGEL_STR)))
+                                (format "<U+%06X>" (u/ord BABY_ANGEL_STR)))
                    (str/replace (re-pattern MIN_SUPPLEMENTARY_CODE_POINT_STR)
-                                (format "<U+%06X>" (ord MIN_SUPPLEMENTARY_CODE_POINT_STR)))
+                                (format "<U+%06X>" (u/ord MIN_SUPPLEMENTARY_CODE_POINT_STR)))
                    (str/replace (re-pattern MAX_CODE_POINT_STR)
-                                (format "<U+%06X>" (ord MAX_CODE_POINT_STR)))
+                                (format "<U+%06X>" (u/ord MAX_CODE_POINT_STR)))
                    )]
-        (is (= s2 (escape-supp s))))
+        (is (= s2 (u/escape-supp s))))
       ;; If there are no supplementary characters, escape-supp should
       ;; return the original string.
-      (is (= s (escape-supp s)))))
+      (is (= s (u/escape-supp s)))))
   
   (is (= "\u0300 combining grave accent (not a surrogate)"
-         (escape-supp "\u0300 combining grave accent (not a surrogate)")))
+         (u/escape-supp "\u0300 combining grave accent (not a surrogate)")))
   (is (= "<U+D83D> only leading surrogate"
-         (escape-supp "\uD83D only leading surrogate")))
+         (u/escape-supp "\uD83D only leading surrogate")))
   (is (= "<U+DE03> only trailing surrogate"
-         (escape-supp "\uDE03 only trailing surrogate")))
+         (u/escape-supp "\uDE03 only trailing surrogate")))
   (is (= "only leading surrogate <U+D83D>"
-         (escape-supp "only leading surrogate \uD83D")))
+         (u/escape-supp "only leading surrogate \uD83D")))
   (is (= (str "two consecutive "
               (format "<U+%04X>" (int (.charAt ^String MIN_LEADING_SURROGATE_STR 0)))
               (format "<U+%04X>" (int (.charAt ^String MAX_LEADING_SURROGATE_STR 0)))
               " leading surrogates")
-         (escape-supp (str "two consecutive "
-                           MIN_LEADING_SURROGATE_STR
-                           MAX_LEADING_SURROGATE_STR
-                           " leading surrogates"))))
+         (u/escape-supp (str "two consecutive "
+                             MIN_LEADING_SURROGATE_STR
+                             MAX_LEADING_SURROGATE_STR
+                             " leading surrogates"))))
   (is (= (str "two consecutive "
               (format "<U+%04X>" (int (.charAt ^String MIN_TRAILING_SURROGATE_STR 0)))
               (format "<U+%04X>" (int (.charAt ^String MAX_TRAILING_SURROGATE_STR 0)))
               " trailing surrogates")
-           (escape-supp (str "two consecutive "
+         (u/escape-supp (str "two consecutive "
                              MIN_TRAILING_SURROGATE_STR
                              MAX_TRAILING_SURROGATE_STR
                              " trailing surrogates"))))
@@ -304,12 +304,12 @@
 (deftest test-codepoints
   (is (= "61 300 1234 4567 1B1B 1D11E"
          (hex-codeunit-str
-          (codepoints "a\u0300\u1234\u4567\u1b1b\ud834\udd1e"))))
+          (u/codepoints "a\u0300\u1234\u4567\u1b1b\ud834\udd1e"))))
   (is (= "0 300 FFFF 10000 10FFFF 1D11E"
          (hex-codeunit-str
-          (codepoints "\u0000\u0300\uffff\ud800\udc00\udbff\udfff\ud834\udd1e"))))
+          (u/codepoints "\u0000\u0300\uffff\ud800\udc00\udbff\udfff\ud834\udd1e"))))
   (is (= "1F603 20 73 6D 69 6C 69 6E 67 20 66 61 63 65"
-         (hex-codeunit-str (codepoints "\uD83D\uDE03 smiling face")))))
+         (hex-codeunit-str (u/codepoints "\uD83D\uDE03 smiling face")))))
 
 
 (defn cp-strings-via-regex
@@ -327,7 +327,7 @@
 
 (defn cp-strings-via-codepoints
   [^String s]
-  (map chr (codepoints s)))
+  (map u/chr (u/codepoints s)))
 
 
 ;; I wrapped these two calls in seq because these two are not equal
@@ -348,9 +348,9 @@
 
 (deftest ^:slow test-3-codepoints-slow
   (doseq [i (all-codepoints)]
-    (let [s (apply str (repeat 3 (chr i)))]
-      (is (= (repeat 3 (chr i)) (cp-strings-via-codepoints s)))
-      (is (= (repeat 3 (chr i)) (cp-strings-via-regex s))))))
+    (let [s (apply str (repeat 3 (u/chr i)))]
+      (is (= (repeat 3 (u/chr i)) (cp-strings-via-codepoints s)))
+      (is (= (repeat 3 (u/chr i)) (cp-strings-via-regex s))))))
 
 
 ;; Clojure's clojure.string/reverse actually reverses valid UTF-16
@@ -359,7 +359,7 @@
 (deftest test-reverse-and-codepoints
   (doseq [s valid-utf16-strings]
     (is (= (str/reverse s)
-           (apply str (map chr (reverse (codepoints s))))))))
+           (apply str (map u/chr (reverse (u/codepoints s))))))))
 
 
 (defn contains-supp?-slower
@@ -371,19 +371,19 @@
 
 (deftest test-contains-supp?
   (doseq [s valid-utf16-strings]
-    (is (= (contains-supp? s) (contains-supp?-slower s)))))
+    (is (= (u/contains-supp? s) (contains-supp?-slower s)))))
 
 
 (deftest test-cp-count
   (doseq [s valid-utf16-strings]
-    (is (= (cp-count s) (count (cp-strings-via-regex s))))))
+    (is (= (u/cp-count s) (count (cp-strings-via-regex s))))))
 
 
 (deftest ^:slow test-cp-count-slow
   (doseq [i (all-codepoints)]
-    (let [s (chr i)]
-      (is (= 1 (cp-count s)))
-      (is (= (if (bmp-codepoint? i) 1 2) (count s))))))
+    (let [s (u/chr i)]
+      (is (= 1 (u/cp-count s)))
+      (is (= (if (u/bmp-codepoint? i) 1 2) (count s))))))
 
 
 (defn cp-subs-via-codepoints
@@ -469,23 +469,23 @@
 
 (deftest test-cp-subs
   (doseq [s valid-utf16-strings]
-    (let [n (cp-count s)]
+    (let [n (u/cp-count s)]
       (doseq [start (maybe-partial-range 0 n)]
-        (let [fast (cp-subs s start)
+        (let [fast (u/cp-subs s start)
               medium (cp-subs-likely-slower-than-java s start)
               slow (cp-subs-via-codepoints s start)]
           (is (= fast medium slow))
-          (is (= true (utf16? fast)))))
+          (is (= true (u/utf16? fast)))))
       (doseq [start (cons n (maybe-partial-range 0 n))
               end (cons n (maybe-partial-range start n))]
-        (let [fast (cp-subs s start end)
+        (let [fast (u/cp-subs s start end)
               medium (cp-subs-likely-slower-than-java s start end)
               slow (cp-subs-via-codepoints s start end)]
           (is (= fast medium slow))
-          (is (= true (utf16? fast)))))
-      (is (thrown? StringIndexOutOfBoundsException (cp-subs s -1)))
-      (is (thrown? StringIndexOutOfBoundsException (cp-subs s (inc n))))
-      (is (thrown? StringIndexOutOfBoundsException (cp-subs s 0 (inc n)))))))
+          (is (= true (u/utf16? fast)))))
+      (is (thrown? StringIndexOutOfBoundsException (u/cp-subs s -1)))
+      (is (thrown? StringIndexOutOfBoundsException (u/cp-subs s (inc n))))
+      (is (thrown? StringIndexOutOfBoundsException (u/cp-subs s 0 (inc n)))))))
 
 
 (defn ^String ccs-subs-slow?
@@ -541,14 +541,14 @@
          [ 0x0041 0x0300 0x0309 ] ; A + 2 combining chars
          [ 0x10000 0x651 0xfb1e 0xe01ef ] ; LINEAR B SYLLABLE + 3 combining
          ]
-        ccss (vec (map (fn [cp-list] (apply str (map chr cp-list)))
+        ccss (vec (map (fn [cp-list] (apply str (map u/chr cp-list)))
                        ccs-cp-lists))
 
         ccs-vec1 [ (ccss 0) (ccss 1) (ccss 2) (ccss 3) (ccss 4) ]
         ccs-vec2 [ (ccss 1) (ccss 2) (ccss 3) (ccss 4) ]
-        ccs-vec3 [ (cp-subs (ccss 1) 1)  ; first 1 char is combining char
+        ccs-vec3 [ (u/cp-subs (ccss 1) 1)  ; first 1 char is combining char
                    (ccss 2) (ccss 3) (ccss 4) ]
-        ccs-vec3 [ (cp-subs (ccss 4) 1)  ; first 3 chars are combining chars
+        ccs-vec3 [ (u/cp-subs (ccss 4) 1)  ; first 3 chars are combining chars
                    (ccss 2) (ccss 3) (ccss 0) ]
         ]
     (doseq [ccs-vec [ ccs-vec1 ccs-vec2 ccs-vec3 ]]
@@ -557,53 +557,53 @@
         ;;(printf "\n")
         (doseq [start (range 0 (inc num-ccs))
                 end (range start (inc num-ccs))]
-;;          (printf "start=%d end=%d (cp-count (ccs-subs s start end))=%d\n"
-;;                  start end (cp-count (ccs-subs s start end))) (flush)
-          (is (= (ccs-subs s start end)
+;;          (printf "start=%d end=%d (u/cp-count (u/ccs-subs s start end))=%d\n"
+;;                  start end (u/cp-count (u/ccs-subs s start end))) (flush)
+          (is (= (u/ccs-subs s start end)
                  (ccs-subs-slow? s start end)
                  (apply str (subvec ccs-vec start end)))))
         (doseq [start (range 0 (inc num-ccs))]
           ;;(printf "start=%d end=none\n" start) (flush)
-          (is (= (ccs-subs s start)
+          (is (= (u/ccs-subs s start)
                  (ccs-subs-slow? s start)
                  (apply str (subvec ccs-vec start))))
           ;;(printf "start=%d end=%d should be exception\n" start (inc num-ccs)) (flush)
           (is (thrown? StringIndexOutOfBoundsException
-                       (ccs-subs s start (inc num-ccs))))
+                       (u/ccs-subs s start (inc num-ccs))))
           ;;(printf "start=%d end=%d should be exception\n" start (inc num-ccs)) (flush)
           (is (thrown? StringIndexOutOfBoundsException
                        (ccs-subs-slow? s start (inc num-ccs))))
           )
         (is (thrown? StringIndexOutOfBoundsException
-                     (ccs-subs s (inc num-ccs))))
+                     (u/ccs-subs s (inc num-ccs))))
         (is (thrown? StringIndexOutOfBoundsException
                      (ccs-subs-slow? s (inc num-ccs))))
         (is (thrown? StringIndexOutOfBoundsException
-                     (ccs-subs s (inc num-ccs) (+ num-ccs 2))))
+                     (u/ccs-subs s (inc num-ccs) (+ num-ccs 2))))
         (is (thrown? StringIndexOutOfBoundsException
                      (ccs-subs-slow? s (inc num-ccs) (+ num-ccs 2))))))))
 
 
 (defn cp-escape-slow [s cmap]
   (let [strmap (reduce (fn [m [cp x]]
-                         (assoc m (chr cp) x))
+                         (assoc m (u/chr cp) x))
                        {} cmap)]
     (apply str (map #(get strmap % %) (cp-strings-via-regex s)))))
 
 
 (deftest test-cp-escape
-  (let [f (fn [s cmap] (= (cp-escape s cmap) (cp-escape-slow s cmap)))]
-    (let [cmap {(ord MUSICAL_SYMBOL_G_CLEF_STR) "<MUSICAL SYMBOL G CLEF>",
-                (ord COMBINING_GRAVE_ACCENT_STR) "<COMBINING GRAVE ACCENT>"
-                (ord BABY_ANGEL_STR) "<BABY ANGEL>"}
+  (let [f (fn [s cmap] (= (u/cp-escape s cmap) (cp-escape-slow s cmap)))]
+    (let [cmap {(u/ord MUSICAL_SYMBOL_G_CLEF_STR) "<MUSICAL SYMBOL G CLEF>",
+                (u/ord COMBINING_GRAVE_ACCENT_STR) "<COMBINING GRAVE ACCENT>"
+                (u/ord BABY_ANGEL_STR) "<BABY ANGEL>"}
           s1 (str "a" COMBINING_GRAVE_ACCENT_STR "\u1234\u4567\u1b1b"
                  MUSICAL_SYMBOL_G_CLEF_STR)]
       (is (= (str "a" "<COMBINING GRAVE ACCENT>" "\u1234\u4567\u1b1b"
                   "<MUSICAL SYMBOL G CLEF>")
-             (cp-escape s1 cmap)
+             (u/cp-escape s1 cmap)
              (cp-escape-slow s1 cmap)))
       (doseq [s valid-utf16-strings]
-        (is (= (cp-escape s cmap) (cp-escape-slow s cmap)))))))
+        (is (= (u/cp-escape s cmap) (cp-escape-slow s cmap)))))))
 
 
 ;; The test below "passes" with this software:
@@ -727,7 +727,7 @@
     (doseq [c (all-codepoints-with-surrogates)]
       (aset a 0 (int c))
       (let [s (String. a 0 1)]
-        (is (= (if (bmp-codepoint? c) 1 2) (count s))))))
+        (is (= (if (u/bmp-codepoint? c) 1 2) (count s))))))
   (is (thrown? IllegalArgumentException
                (String. (int-array 1 (dec Character/MIN_CODE_POINT)) 0 1)))
   (is (thrown? IllegalArgumentException
@@ -866,7 +866,7 @@
                    ;; Create a map for each codepoint with some info
                    (map (fn [i] {:cp i
                                  :java-enum-int-val (Character/getType (int i))
-                                 :str (chr i)}))
+                                 :str (u/chr i)}))
 ;;                   ;; Skip over code points that are private or unassigned.
 ;;                   (remove (fn [m]
 ;;                             (#{ Character/UNASSIGNED
@@ -995,7 +995,7 @@
                             (set (mapcat (fn [{:keys [first-cp last-cp]}]
                                            (range first-cp (inc last-cp)))
                                          (script-map script-name)))
-                            do-match-cps (set (filter #(re-find pat (chr %))
+                            do-match-cps (set (filter #(re-find pat (u/chr %))
                                                       (all-codepoints)))
                             good-match-cps (set/intersection should-match-cps
                                                              do-match-cps)
@@ -1028,7 +1028,7 @@
 ;                    (doseq [{:keys [first-cp last-cp]}
 ;                            (script-map script-name)]
 ;                      (doseq [cp (range first-cp (inc last-cp))]
-;                        (let [s (chr cp)]
+;                        (let [s (u/chr cp)]
 ;                          (when (not (re-find pat s))
 ;                            (printf "    U+%06X should match, but doesn't\n" cp)))))
                       )
@@ -1045,12 +1045,12 @@
         (printf "\n")
         (let [normalized-forms
               (->> (all-codepoints)
-                   (map (fn [i] {:cp i :str (chr i)}))
+                   (map (fn [i] {:cp i :str (u/chr i)}))
                    (map (fn [m] (assoc m
-                                  :nfc (NFC (:str m))
-                                  :nfd (NFD (:str m))
-                                  :nfkc (NFKC (:str m))
-                                  :nfkd (NFKD (:str m))))))]
+                                  :nfc (u/NFC (:str m))
+                                  :nfd (u/NFD (:str m))
+                                  :nfkc (u/NFKC (:str m))
+                                  :nfkd (u/NFKD (:str m))))))]
           (printf "hex-codepoint
 ;string S, containing that code point and nothing else
 ;max # of codepoints in either NFC or NFD of S
@@ -1070,7 +1070,7 @@
               (printf "%s"
                (str (format "%06X" (:cp m))
                     (format ";%s" (:str m))
-                    (format ";%d" (max (cp-count (:nfc m)) (cp-count (:nfd m))))
+                    (format ";%d" (max (u/cp-count (:nfc m)) (u/cp-count (:nfd m))))
                     (format ";%s" (if (= (:str m) (:nfc m))
                                     "" (hex-codepoint-str (:nfc m))))
                     (format ";%s" (if (= (:str m) (:nfc m))
@@ -1080,7 +1080,7 @@
                     (format ";%s" (if (= (:str m) (:nfd m))
                                     "" (:nfd m)))
 
-                    (format ";%d" (max (cp-count (:nfkc m)) (cp-count (:nfkd m))))
+                    (format ";%d" (max (u/cp-count (:nfkc m)) (u/cp-count (:nfkd m))))
                     (format ";%s" (if (= (:str m) (:nfkc m))
                                     "" (hex-codepoint-str (:nfkc m))))
                     (format ";%s" (if (= (:str m) (:nfkc m))
