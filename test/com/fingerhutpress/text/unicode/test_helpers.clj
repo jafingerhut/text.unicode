@@ -2,6 +2,8 @@
   (:require [clojure.string :as str]
             [com.fingerhutpress.text.unicode :as u]))
 
+(set! *warn-on-reflection* true)
+
 
 (defn print-interesting-jvm-version-properties []
   (let [p (System/getProperties)]

@@ -10,18 +10,14 @@ See documentation for individual functions in the source code.
 
 ### Reminder to self on how to run the optional tests
 
-Test selectors used in the test file now:
+Test selectors used in the test files now:
 
 ```
 % lein test :slow    ; takes many minutes right now
 % lein test :char-types
 % lein test :normalized-forms
-% lein test :test-unicode-property-names
+% lein test :property-names
 ```
-
-TBD: Consider putting some of those in separate test namespaces, then
-use `lein test namespace.name` to run only the tests in that
-namespace.
 
 
 ## License

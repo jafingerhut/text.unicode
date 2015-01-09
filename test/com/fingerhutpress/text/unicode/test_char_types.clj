@@ -6,10 +6,11 @@
             [com.fingerhutpress.text.unicode :as u]
             [com.fingerhutpress.text.unicode.test-helpers :as h]))
 
+(set! *warn-on-reflection* true)
 
 
-;; Note: write-char-types-to-file isn't really so much a unit test as
-;; a mechanism of dumping info that the JVM stores about each
+;; Note: deftest write-char-types-to-file isn't really so much a unit
+;; test as a mechanism of dumping info that the JVM stores about each
 ;; character out to a file.  It is human readable, but perhaps better
 ;; used for post-processing and/or comparing against Unicode data
 ;; files, or against the output of a similar program in another
@@ -111,7 +112,8 @@
 
 
 (deftest ^:char-types write-char-types-to-file
-  (let [fname "char-categories.txt"]
+  (let [fname "char-types.txt"]
+    (println (format "Writing file '%s' ..." fname))
     (with-open [f (io/writer fname :encoding "UTF-8")]
       (binding [*out* f]
         (h/print-interesting-jvm-version-properties)

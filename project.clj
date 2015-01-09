@@ -4,10 +4,10 @@
   :test-selectors {:default (fn [m] (and (not (:slow m))
                                          (not (:char-types m))
                                          (not (:normalized-forms m))
-                                         (not (:test-unicode-property-names m))
+                                         (not (:property-names m))
                                          ))
                    :slow :slow
                    :char-types :char-types
                    :normalized-forms :normalized-forms
-                   :test-unicode-property-names :test-unicode-property-names
+                   :property-names :property-names
                    :all (fn [m] true)})
